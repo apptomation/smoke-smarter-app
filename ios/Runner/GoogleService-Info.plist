@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyCPVEvdEOsO7oipwTzZ_ko1dcDKa2-lwSI</string>
+	<key>GCM_SENDER_ID</key>
+	<string>406384317281</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.smokesmarter.smokeSmarterApp</string>
+	<key>PROJECT_ID</key>
+	<string>smoke-smarter</string>
+	<key>STORAGE_BUCKET</key>
+	<string>smoke-smarter.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:406384317281:ios:532a6614e382c2c23f2b20</string>
+</dict>
+</plist>

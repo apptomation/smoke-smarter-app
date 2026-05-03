@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "406384317281",
+    "project_id": "smoke-smarter",
+    "storage_bucket": "smoke-smarter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:406384317281:android:553dbc760096457b3f2b20",
+        "android_client_info": {
+          "package_name": "com.smokesmarter.smoke_smarter_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApW2f3d0NgNLgeEAbNSFN_OJ-ZCd8Wvp8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
