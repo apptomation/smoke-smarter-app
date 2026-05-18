@@ -1,16 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:smoke_smarter_app/features/auth/providers/auth_providers.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notifications = true;
   bool _darkMode = false;
   int _dailyGoal = 5;
+
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(authRepositoryProvider).signOut();
+      // Router guard will redirect to /login automatically
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,18 +56,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Profile section
           _SectionHeader(label: 'Profile', theme: theme),
           Card(
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: colorScheme.primaryContainer,
-                child: Icon(
-                  Icons.person_outline_rounded,
-                  color: colorScheme.onPrimaryContainer,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: colorScheme.primaryContainer,
+                    child: Icon(
+                      Icons.person_outline_rounded,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  title: const Text('Your Name'),
+                  subtitle: const Text('Tap to edit profile'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
                 ),
-              ),
-              title: const Text('Your Name'),
-              subtitle: const Text('Tap to edit profile'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {},
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(
+                  leading: Icon(
+                    Icons.interests_rounded,
+                    color: colorScheme.primary,
+                  ),
+                  title: const Text('My Interests'),
+                  subtitle: const Text('Add or update your interests'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/interests/edit'),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -128,6 +174,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () {},
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Sign out
+          Card(
+            color: colorScheme.errorContainer,
+            child: ListTile(
+              leading: Icon(
+                Icons.logout_rounded,
+                color: colorScheme.onErrorContainer,
+              ),
+              title: Text(
+                'Sign out',
+                style: TextStyle(
+                  color: colorScheme.onErrorContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: _confirmLogout,
             ),
           ),
         ],
