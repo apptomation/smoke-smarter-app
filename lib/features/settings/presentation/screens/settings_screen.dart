@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smoke_smarter_app/features/auth/providers/auth_providers.dart';
+import 'package:smoke_smarter_app/features/user_profile/providers/user_profile_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -13,7 +14,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notifications = true;
   bool _darkMode = false;
-  int _dailyGoal = 5;
+  int? _dailyGoal; // null until profile loaded
+  bool _initialized = false;
 
   Future<void> _confirmLogout() async {
     final confirmed = await showDialog<bool>(
@@ -39,14 +41,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     if (confirmed == true) {
       await ref.read(authRepositoryProvider).signOut();
-      // Router guard will redirect to /login automatically
     }
+  }
+
+  Future<void> _updateGoal(int newGoal) async {
+    setState(() => _dailyGoal = newGoal);
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+    if (uid == null) return;
+    await ref.read(userRepositoryProvider).updateDailyGoal(uid, newGoal);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
+    // Load goal from Firestore profile once
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    if (!_initialized && profile?.cigarettesPerDay != null) {
+      _dailyGoal = profile!.cigarettesPerDay!;
+      _initialized = true;
+    }
+    final goal = _dailyGoal ?? profile?.cigarettesPerDay ?? 10;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -120,25 +136,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     color: colorScheme.primary,
                   ),
                   title: const Text('Daily cigarette goal'),
-                  subtitle: Text('$_dailyGoal cigarettes/day'),
+                  subtitle: Text('$goal cigarettes/day'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         icon: const Icon(Icons.remove),
-                        onPressed: _dailyGoal > 1
-                            ? () => setState(() => _dailyGoal--)
+                        onPressed: goal > 1
+                            ? () => _updateGoal(goal - 1)
                             : null,
                       ),
                       Text(
-                        '$_dailyGoal',
+                        '$goal',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.add),
-                        onPressed: () => setState(() => _dailyGoal++),
+                        onPressed: () => _updateGoal(goal + 1),
                       ),
                     ],
                   ),

@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:smoke_smarter_app/features/daily_log/data/daily_log.dart';
+import 'package:smoke_smarter_app/features/daily_log/providers/log_providers.dart';
+import 'package:smoke_smarter_app/features/user_profile/providers/user_profile_providers.dart';
 
-class ProgressScreen extends StatelessWidget {
+class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    final weeklyAsync = ref.watch(weeklyLogsProvider);
+    final statsAsync = ref.watch(dashboardStatsProvider);
+
+    final daysSinceStart = profile?.quitStartDate != null
+        ? DateTime.now().difference(profile!.quitStartDate!).inDays + 1
+        : 0;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Progress')),
@@ -16,23 +28,51 @@ class ProgressScreen extends StatelessWidget {
           // Weekly overview
           Text(
             'This week',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
-          _WeeklyChart(colorScheme: colorScheme, theme: theme),
+          weeklyAsync.when(
+            loading: () => const Card(
+              child: SizedBox(
+                height: 160,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+            error: (_, __) => const Card(
+              child: SizedBox(
+                height: 160,
+                child: Center(child: Text('Could not load chart')),
+              ),
+            ),
+            data: (logs) => _WeeklyChart(
+              logs: logs,
+              goal: profile?.cigarettesPerDay ?? 10,
+              colorScheme: colorScheme,
+              theme: theme,
+            ),
+          ),
           const SizedBox(height: 24),
+
+          // Summary row
+          if (statsAsync.valueOrNull != null) ...[
+            _SummaryRow(
+              stats: statsAsync.value!,
+              daysSinceStart: daysSinceStart,
+              colorScheme: colorScheme,
+              theme: theme,
+            ),
+            const SizedBox(height: 24),
+          ],
 
           // Milestones
           Text(
             'Milestones',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
-          ..._milestones.map(
+          ..._buildMilestones(daysSinceStart).map(
             (m) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _MilestoneTile(
@@ -46,24 +86,142 @@ class ProgressScreen extends StatelessWidget {
       ),
     );
   }
+
+  List<_Milestone> _buildMilestones(int daysSinceStart) => [
+        _Milestone(
+            label: '1 day on your journey',
+            emoji: '🌅',
+            achieved: daysSinceStart >= 1),
+        _Milestone(
+            label: '3 days on your journey',
+            emoji: '💪',
+            achieved: daysSinceStart >= 3),
+        _Milestone(
+            label: '1 week on your journey',
+            emoji: '🔥',
+            achieved: daysSinceStart >= 7),
+        _Milestone(
+            label: '2 weeks on your journey',
+            emoji: '🏆',
+            achieved: daysSinceStart >= 14),
+        _Milestone(
+            label: '1 month on your journey',
+            emoji: '🎉',
+            achieved: daysSinceStart >= 30),
+        _Milestone(
+            label: '3 months on your journey',
+            emoji: '🌟',
+            achieved: daysSinceStart >= 90),
+        _Milestone(
+            label: '6 months on your journey',
+            emoji: '🥇',
+            achieved: daysSinceStart >= 180),
+        _Milestone(
+            label: '1 year smoke-free',
+            emoji: '👑',
+            achieved: daysSinceStart >= 365),
+      ];
 }
 
-const _milestones = [
-  _Milestone(label: '1 hour smoke-free', emoji: '⏱️', achieved: true),
-  _Milestone(label: '1 day smoke-free', emoji: '🌅', achieved: true),
-  _Milestone(label: '3 days smoke-free', emoji: '💪', achieved: true),
-  _Milestone(label: '1 week smoke-free', emoji: '🔥', achieved: true),
-  _Milestone(label: '2 weeks smoke-free', emoji: '🏆', achieved: false),
-  _Milestone(label: '1 month smoke-free', emoji: '🎉', achieved: false),
-  _Milestone(label: '3 months smoke-free', emoji: '🌟', achieved: false),
-];
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow({
+    required this.stats,
+    required this.daysSinceStart,
+    required this.colorScheme,
+    required this.theme,
+  });
+
+  final DashboardStats stats;
+  final int daysSinceStart;
+  final ColorScheme colorScheme;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _SummaryCard(
+            label: 'Days active',
+            value: '$daysSinceStart',
+            icon: Icons.calendar_today_outlined,
+            colorScheme: colorScheme,
+            theme: theme,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _SummaryCard(
+            label: 'Best streak',
+            value: '${stats.streak}d',
+            icon: Icons.local_fire_department_outlined,
+            colorScheme: colorScheme,
+            theme: theme,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _SummaryCard(
+            label: 'Saved',
+            value: '\$${stats.moneySaved.toStringAsFixed(0)}',
+            icon: Icons.savings_outlined,
+            colorScheme: colorScheme,
+            theme: theme,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.colorScheme,
+    required this.theme,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final ColorScheme colorScheme;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        child: Column(
+          children: [
+            Icon(icon, color: colorScheme.primary, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _Milestone {
-  const _Milestone({
-    required this.label,
-    required this.emoji,
-    required this.achieved,
-  });
+  const _Milestone(
+      {required this.label, required this.emoji, required this.achieved});
 
   final String label;
   final String emoji;
@@ -115,55 +273,111 @@ class _MilestoneTile extends StatelessWidget {
 }
 
 class _WeeklyChart extends StatelessWidget {
-  const _WeeklyChart({required this.colorScheme, required this.theme});
+  const _WeeklyChart({
+    required this.logs,
+    required this.goal,
+    required this.colorScheme,
+    required this.theme,
+  });
 
+  final List<DailyLog> logs;
+  final int goal;
   final ColorScheme colorScheme;
   final ThemeData theme;
 
-  static const _days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  static const _counts = [5, 4, 3, 2, 3, 1, 0];
-  static const _maxGoal = 5;
-
   @override
   Widget build(BuildContext context) {
+    // Build a map of dateKey → count for quick lookup
+    final logMap = {for (final l in logs) l.dateKey: l.count};
+
+    final today = DateTime.now();
+    // Build last 7 days (oldest → newest)
+    final days = List.generate(7, (i) => today.subtract(Duration(days: 6 - i)));
+
+    final dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final maxBar = (goal * 1.5).ceil().clamp(1, 999);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Cigarettes per day',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Cigarettes per day',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+                Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Goal: $goal',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 120,
+              height: 140,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(_days.length, (i) {
-                  final ratio = _counts[i] / _maxGoal;
+                children: List.generate(days.length, (i) {
+                  final day = days[i];
+                  final key =
+                      '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+                  final count = logMap[key] ?? 0;
                   final isToday = i == 6;
+                  final overGoal = count > goal;
+                  final ratio = (count / maxBar).clamp(0.0, 1.0);
+
                   return Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
+                          if (count > 0)
+                            Text(
+                              '$count',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: overGoal
+                                    ? colorScheme.error
+                                    : colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          const SizedBox(height: 2),
                           Expanded(
                             child: Align(
                               alignment: Alignment.bottomCenter,
                               child: AnimatedContainer(
-                                duration: Duration(milliseconds: 400 + i * 60),
+                                duration:
+                                    Duration(milliseconds: 400 + i * 60),
                                 curve: Curves.easeOut,
                                 width: double.infinity,
-                                height: ratio * 90 + 4,
+                                height: ratio * 100 + (count > 0 ? 4 : 0),
                                 decoration: BoxDecoration(
-                                  color: isToday
-                                      ? colorScheme.primary
-                                      : colorScheme.primaryContainer,
+                                  color: overGoal
+                                      ? colorScheme.errorContainer
+                                      : isToday
+                                          ? colorScheme.primary
+                                          : colorScheme.primaryContainer,
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
@@ -171,7 +385,7 @@ class _WeeklyChart extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            _days[i],
+                            dayLabels[day.weekday - 1],
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: isToday
                                   ? colorScheme.primary
@@ -188,9 +402,37 @@ class _WeeklyChart extends StatelessWidget {
                 }),
               ),
             ),
+            // Goal line indicator
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 1,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: colorScheme.primary.withAlpha(80),
+                          width: 1,
+                          style: BorderStyle.solid,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'daily goal',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.primary.withAlpha(150),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 }
+

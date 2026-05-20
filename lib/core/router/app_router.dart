@@ -7,6 +7,7 @@ import 'package:smoke_smarter_app/features/auth/providers/auth_providers.dart';
 import 'package:smoke_smarter_app/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:smoke_smarter_app/features/interests/presentation/screens/interests_screen.dart';
 import 'package:smoke_smarter_app/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:smoke_smarter_app/features/smoking_profile/presentation/screens/smoking_profile_screen.dart';
 import 'package:smoke_smarter_app/features/progress/presentation/screens/progress_screen.dart';
 import 'package:smoke_smarter_app/features/settings/presentation/screens/settings_screen.dart';
 import 'package:smoke_smarter_app/features/user_profile/providers/user_profile_providers.dart';
@@ -17,6 +18,7 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Routes that don't require authentication.
 const _unauthRoutes = {'/onboarding', '/login', '/register'};
+
 
 GoRouter buildAppRouter(Ref ref) {
   return GoRouter(
@@ -34,32 +36,43 @@ GoRouter buildAppRouter(Ref ref) {
       // Logged in → redirect away from unauth routes
       if (_unauthRoutes.contains(loc)) {
         final profileAsync = ref.read(userProfileProvider);
-        // Profile still loading — stay put; _RouterNotifier will re-trigger
-        // once Firestore responds so we can decide correctly then.
         if (profileAsync.isLoading) return null;
-        final hasInterests = profileAsync.valueOrNull?.hasInterests ?? false;
-        return hasInterests ? '/dashboard' : '/interests';
+        final profile = profileAsync.valueOrNull;
+        if (profile == null || !profile.hasInterests) return '/interests';
+        if (!profile.hasSmokingProfile) return '/smoking-profile';
+        return '/dashboard';
       }
 
-      // Logged in + on /interests (first-time setup) —
-      // if profile already has interests, skip to dashboard.
+      // Allow edit routes always
+      if (loc == '/interests/edit') return null;
+
+      // On /interests first-time — skip if already done
       if (loc == '/interests') {
         final profileAsync = ref.read(userProfileProvider);
         if (profileAsync.hasValue &&
             (profileAsync.valueOrNull?.hasInterests ?? false)) {
+          final profile = profileAsync.valueOrNull!;
+          return profile.hasSmokingProfile ? '/dashboard' : '/smoking-profile';
+        }
+        return null;
+      }
+
+      // On /smoking-profile — skip if already done
+      if (loc == '/smoking-profile') {
+        final profileAsync = ref.read(userProfileProvider);
+        if (profileAsync.hasValue &&
+            (profileAsync.valueOrNull?.hasSmokingProfile ?? false)) {
           return '/dashboard';
         }
         return null;
       }
 
-      // Logged in + on /interests/edit → always allow (coming from Settings)
-      if (loc == '/interests/edit') return null;
-
-      // Logged in + on any other protected route → ensure interests are done
+      // On any protected route — ensure full setup is complete
       final profileAsync = ref.read(userProfileProvider);
       if (profileAsync.hasValue) {
-        final hasInterests = profileAsync.valueOrNull?.hasInterests ?? false;
-        if (!hasInterests) return '/interests';
+        final profile = profileAsync.valueOrNull;
+        if (profile == null || !profile.hasInterests) return '/interests';
+        if (!profile.hasSmokingProfile) return '/smoking-profile';
       }
 
       return null;
@@ -85,6 +98,10 @@ GoRouter buildAppRouter(Ref ref) {
       GoRoute(
         path: '/interests/edit',
         builder: (context, state) => const InterestsScreen(isEditing: true),
+      ),
+      GoRoute(
+        path: '/smoking-profile',
+        builder: (context, state) => const SmokingProfileScreen(),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
